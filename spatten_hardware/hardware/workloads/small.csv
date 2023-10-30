@@ -1,0 +1,3 @@
+iteration_id,layer_id,head_id,embedding_length_D,sentence_length_L,key_fetch_num,quant_key_bit,quant_query_bit,auto_requant_thres,if_requant,auto_requant_incre,value_fetch_num,quant_value_bit,if_accumulate_importance,if_rescale_previous_importance,if_topk,topk
+0,0,0,64.0,993,993,-1,-1,-1,False,-1,993,-1,True,False,False,-1
+configs/gpt2/ptb/medium_baseline_train+eval.yml,,,,,,,,,,,,,,,,
