@@ -52,7 +52,8 @@ object TestSpAtten {
         }
 
         val reqs = reader.allWithHeaders().filter(x => 
-            selectIteration < 0 || Try(x("iteration_id").toInt == selectIteration).getOrElse(false)
+            Try(x("iteration_id").toInt).isSuccess &&
+            (selectIteration < 0 || x("iteration_id").toInt == selectIteration)
         ).map(map => new {
             val FORCE_NO_PRUNING       = false
             val FORCE_LOCAL_PRUNING    = false

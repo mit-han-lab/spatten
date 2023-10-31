@@ -14,6 +14,9 @@ object Softmax {
     }
 }
 
+// A dummy module since we don't get access to the floating point IPs in verilator
+// We use external area/power numbers to evaluate the cost of Softmax 
+// TODO: maybe use a DPI-based FP units during simulation
 class Softmax[TContext <: Data](genContext: HardType[TContext])(implicit config: SpAttenConfig) extends Component {
 
     import Softmax._

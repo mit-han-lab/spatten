@@ -32,6 +32,8 @@ class TopKBase[T <: Data, TContext <: Data](val config: TopK.Config[T, TContext]
     }
 }
 
+// A dummy module which uses precomputed latency to simulate the behaviors of TopK module
+// TODO: switch to the real TopK module during simulation
 class TopKDummy[T <: Data, TContext <: Data](config: TopK.Config[T, TContext], funcGetCycle: TContext => UInt) extends TopKBase(config) {
     import TopK._
     import config._
@@ -85,6 +87,7 @@ class TopKDummy[T <: Data, TContext <: Data](config: TopK.Config[T, TContext], f
 
 }
 
+// The real topk module
 class TopK[T <: Data, TContext <: Data](config: TopK.Config[T, TContext]) extends TopKBase(config) {
     import TopK._
     import config._

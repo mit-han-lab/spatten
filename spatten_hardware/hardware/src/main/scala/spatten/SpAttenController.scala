@@ -17,12 +17,6 @@ class SpAttenController(implicit config: SpAttenConfig) extends Component with S
         val resp = master Stream(SpAttenResponse(config))
     }
 
-    // io.bus.foreach { bus => 
-    //     bus.ar.valid := False
-    //     bus.ar.payload.assignDontCare()
-    //     bus.r.ready := False
-    // }
-
     case class ScoreBufferLine() extends Bundle {
         val indexes   = Vec(UInt(log2Up(maxNumKey) bits), numMatrixFetcherChannel)
         val num_index = UInt(log2Up(numMatrixFetcherChannel + 1) bits)
@@ -30,7 +24,7 @@ class SpAttenController(implicit config: SpAttenConfig) extends Component with S
     val score_buf = new MultiPortRAMFactory(ScoreBufferLine(), numBufferLines)
 
     val rng = new Random
-    rng.setSeed(233)
+    rng.setSeed(1)
     score_buf.init(for (i <- 0 until numBufferLines) yield {
         val ret = ScoreBufferLine()
         ret.num_index := numMatrixFetcherChannel
@@ -179,19 +173,6 @@ class SpAttenController(implicit config: SpAttenConfig) extends Component with S
         val output = stageOut(input_forked._2.stage())
         // output <-< input_forked._2
     }
-
-    // requantize_report << areaRequantizeOrRelease.output.translateInto(cloneOf(requantize_report)) { (to, from) => 
-    //     to.need_requantize := !from.is_requantize
-    // }.queue(4)
-    // areaRequantizeOrRelease.output.freeRun()
-    // requantize_report.valid := areaRequantizeOrRelease.output.valid
-    // requantize_report.payload.need_requantize := False
-    // keybuf_alloc_inst.io.release_req.valid := False
-    // keybuf_alloc_inst.io.release_req.payload.assignDontCare()
-    // keybuf_alloc_inst.io.release_resp.freeRun()
-    // io.req.ready := False
-
-    // 2.892s
 
     case class BufferTag() extends Bundle {
         val batch_id      = genBatchId()
@@ -384,22 +365,6 @@ class SpAttenController(implicit config: SpAttenConfig) extends Component with S
         val output = stageOut(dotproduct_inst.io.resp)
     }
 
-    // requantize_report << areaDotProduct.output.throwWhen(!areaDotProduct.output.last).translateInto(cloneOf(requantize_report)) { (to, from) => 
-    //     to.need_requantize := False
-    // }.queue(4)
-
-    // // requantize_report.valid := False
-    // // requantize_report.payload.need_requantize.assignDontCare()
-
-    // // areaDotProduct.output.freeRun()
-
-    // areaMatFetcherManager.req_val.valid := False
-    // areaMatFetcherManager.req_val.payload.assignDontCare()
-    // areaMatFetcherManager.resp_val.freeRun()
-
-    // io.resp.valid := False
-    // io.resp.payload.assignDontCare()
-
     val stageSoftmax = new Stage("StageSoftmax") {
         val input = stageIn(stageDotProduct.output)
 
@@ -439,8 +404,6 @@ class SpAttenController(implicit config: SpAttenConfig) extends Component with S
 
         val output = stageOut(requant_result_forked._2)
     }
-
-    // requantize_report << stageRequantDecision.output_requantize_report
 
     // buffer the following requests after a request have to perform requantization
     val stageRequantBuffer = new Stage("StageRequantBuffer") {
@@ -498,15 +461,6 @@ class SpAttenController(implicit config: SpAttenConfig) extends Component with S
         val output = stageOut(output_raw.stage())
     }
 
-    // areaRequantBuffer.output.freeRun()
-
-    // areaMatFetcherManager.req_val.valid := False
-    // areaMatFetcherManager.req_val.payload.assignDontCare()
-    // areaMatFetcherManager.resp_val.freeRun()
-
-    // io.resp.valid := False
-    // io.resp.payload.assignDontCare()
-
     // TODO: When size_d > 64, not all scores are valid from the softmax module, we need a FIFO here
     case class TopKElement() extends Bundle {
         val score = genFix()
@@ -552,10 +506,6 @@ class SpAttenController(implicit config: SpAttenConfig) extends Component with S
         }.stage())
     }
 
-    // areaRebatch.output.freeRun()
-    // io.resp.valid := False
-    // io.resp.payload.assignDontCare()
-    
     // val useDummyTopK = true
 
     val topk_inst = if (useDummyTopK) { 
@@ -571,12 +521,6 @@ class SpAttenController(implicit config: SpAttenConfig) extends Component with S
             (x: TopKElement, y: TopKElement) => x.score > y.score,
             (x: TopKElement, y: TopKElement) => x.score === y.score))
     }
-
-    // val topk_inst = new TopK(TopK.Config(
-    //     TopKElement(), RequestEx(), 
-    //     numSoftMaxUnit, maxNumKey, 
-    //     (x: TopKElement, y: TopKElement) => x.score > y.score,
-    //     (x: TopKElement, y: TopKElement) => x.score === y.score))
 
     // We lost the index information during the matrixfetcher stage :(, load them back before doing TopK
     val areaReloadIndexes = new Area {
@@ -667,15 +611,6 @@ class SpAttenController(implicit config: SpAttenConfig) extends Component with S
             topk_resp, 
             input_skip.haltWhen(num_onfly_transaction =/= 0))
     }
-
-    // areaTopK.output.freeRun()
-
-    // areaMatFetcherManager.req_val.valid := False
-    // areaMatFetcherManager.req_val.payload.assignDontCare()
-    // areaMatFetcherManager.resp_val.freeRun()
-
-    // io.resp.valid := False
-    // io.resp.payload.assignDontCare()
 
     val valbuf_release_request = Stream(RequestEx())
 

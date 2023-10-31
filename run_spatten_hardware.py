@@ -30,7 +30,7 @@ class SpAtten:
     def __compile(self):
         os.makedirs(self.workdir, exist_ok=True)
 
-        hardware_dir = os.path.join(os.path.dirname(__file__), "hardware")
+        hardware_dir = os.path.join(os.path.dirname(__file__), "spatten_hardware/hardware")
         jar_path = os.path.join(hardware_dir, "target/scala-2.13/spatten-assembly-1.0.jar")
         extra_files = ["ramulator_config.yaml", "dpi", "third_party"]
 

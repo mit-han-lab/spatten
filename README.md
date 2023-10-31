@@ -59,24 +59,36 @@ This repo also contains the RTL-level simulation model of SpAtten in `spatten_ha
 #### Quick Start
 Build the ramulator2
 ```
-$ cd hardware/third_party/ramulator2
+$ cd spatten_hardware/hardware/third_party/ramulator2
 $ mkdir build
 $ cd build
 $ cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo
 $ make
-$ cd -
+$ cd ../../../..
 ```
 Build the Verilog (DPI) interface for ramulator
 ```
 $ cd hardware/dpi
 $ make
-$ cd -
+$ cd ../../..
 ```
 Use the python script to run SpAtten simulation with a workload file
 ```
 python3 run_spatten_hardware.py hardware/workloads/summary-gpt2-small-wikitext2-per8.csv
 ```
+The evaluation results is located in the working directory `spatten.workdir/summary.txt`
 
+### SpAtten Hardware Architecture
+![spatten arch](https://assets-global.website-files.com/64f4e81394e25710d22d042e/6515ab835deaead9f35609ac_spatten_arch.jpeg)
+
+SpAtten uses a specialized pipeline to support efficient attention and focus on memory traffic optimizations for decoding models like GPT2 and LLMs. 
+
+This repo contains the following major modules in SpAtten, and the main pipeline implementation is in [SpAttenController.scala](./hardware/src/main/scala/spatten/SpAttenController.scala).
+
+- A parallelized top-k unit (10) that dynamically decides the values to fetch: [TopK.scala](./hardware/src/main/scala/spatten/TopK.scala), which uses [QuickSelect.scala](./hardware/src/main/scala/spatten/utils/QuickSelect.scala) to choose the k-th largest element from attention prob
+- A matrix fetcher ((3) and (6) in the figure) that loads the key/value matrix from DRAM and convert the bitwidth when necessary: [MatrixFetcher.scala](./hardware/src/main/scala/spatten/MatrixFetcher.scala)
+- The Q\*K (7) and Prob\*V (11) unit and the corresponding key / value buffers: [DotProduct.scala](./hardware/src/main/scala/spatten/DotProduct.scala), [MultiplyValue.scala](./hardware/src/main/scala/spatten/MultiplyValue.scala), [Buffer.scala](./hardware/src/main/scala/spatten/Buffer.scala), [BufferManager.scala](./hardware/src/main/scala/spatten/BufferManager.scala)
+- A progressive quantization module (9) to decide whether or not to load the LSBs of keys: [RequantDecision.scala](./hardware/src/main/scala/spatten/RequantDecision.scala)
 
 
 ## TODOs
@@ -86,6 +98,7 @@ We will release the code and data soon, please stay tuned.
 - [ ] Release perplexity evaluation code
 - [ ] Release SpAtten Llama Chatbot demo.
 - [ ] Release SpAtten evaluation code.
+- [ ] Release a docker image for hardware simulation.
 
 
 ## Citation
@@ -109,3 +122,4 @@ If you find SpAtten useful or relevant to your project and research, please kind
         year={2023}
         }
 ``` -->
+
