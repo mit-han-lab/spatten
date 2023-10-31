@@ -11,7 +11,7 @@
 
 
 ## TL;DR
-We propose sparse attentin (SpAtten) with **KV token pruning, local V pruning, head pruning, and KV progressive quantization** to improve LLM efficiency.
+We propose sparse attention (SpAtten) with **KV token pruning, local V pruning, head pruning, and KV progressive quantization** to improve LLM efficiency.
 
 ## News
 
