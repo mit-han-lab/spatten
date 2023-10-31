@@ -5,7 +5,7 @@
 # SpAtten: Sparse Attention with Token Pruning and Head Pruning in Large Language Models
 
 
-[[paper](https://hanlab.mit.edu/projects/spatten)] [[slides](https://www.dropbox.com/s/z189gu92h7uy7yt/SpAtten-for-long-video-no-animation.pdf?dl=0)] [[video](https://www.youtube.com/watch?v=Cln8hFxM9Do)] [[website](spatten.mit.edu)] 
+[[paper](https://arxiv.org/abs/2012.09852)] [[slides](https://www.dropbox.com/s/z189gu92h7uy7yt/SpAtten-for-long-video-no-animation.pdf?dl=0)] [[video](https://www.youtube.com/watch?v=Cln8hFxM9Do)] [[website](https://hanlab.mit.edu/projects/spatten)] 
 
 <!-- ![schemes](figures/schemes.png) -->
 
