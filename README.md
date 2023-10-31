@@ -1,5 +1,5 @@
 <p align="center">
-<img src="assets/spatten-logo.png" alt="spatten Logo" width="450">
+<img src="assets/spatten-logo.png" alt="spatten Logo" width="220">
 </p>
 
 # SpAtten: Sparse Attention with Token Pruning and Head Pruning in Large Language Models
