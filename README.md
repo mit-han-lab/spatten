@@ -83,12 +83,12 @@ The evaluation results is located in the working directory `spatten.workdir/summ
 
 SpAtten uses a specialized pipeline to support efficient attention and focus on memory traffic optimizations for decoding models like GPT2 and LLMs. 
 
-This repo contains the following major modules in SpAtten, and the main pipeline implementation is in [SpAttenController.scala](./hardware/src/main/scala/spatten/SpAttenController.scala).
+This repo contains the following major modules in SpAtten, and the main pipeline implementation is in [SpAttenController.scala](./spatten_hardware/hardware/src/main/scala/spatten/SpAttenController.scala).
 
-- A parallelized top-k unit (10) that dynamically decides the values to fetch: [TopK.scala](./hardware/src/main/scala/spatten/TopK.scala), which uses [QuickSelect.scala](./hardware/src/main/scala/spatten/utils/QuickSelect.scala) to choose the k-th largest element from attention prob
-- A matrix fetcher ((3) and (6) in the figure) that loads the key/value matrix from DRAM and convert the bitwidth when necessary: [MatrixFetcher.scala](./hardware/src/main/scala/spatten/MatrixFetcher.scala)
-- The Q\*K (7) and Prob\*V (11) unit and the corresponding key / value buffers: [DotProduct.scala](./hardware/src/main/scala/spatten/DotProduct.scala), [MultiplyValue.scala](./hardware/src/main/scala/spatten/MultiplyValue.scala), [Buffer.scala](./hardware/src/main/scala/spatten/Buffer.scala), [BufferManager.scala](./hardware/src/main/scala/spatten/BufferManager.scala)
-- A progressive quantization module (9) to decide whether or not to load the LSBs of keys: [RequantDecision.scala](./hardware/src/main/scala/spatten/RequantDecision.scala)
+- A parallelized top-k unit (10) that dynamically decides the values to fetch: [TopK.scala](./spatten_hardware/hardware/src/main/scala/spatten/TopK.scala), which uses [QuickSelect.scala](./spatten_hardware/hardware/src/main/scala/spatten/utils/QuickSelect.scala) to choose the k-th largest element from attention prob
+- A matrix fetcher ((3) and (6) in the figure) that loads the key/value matrix from DRAM and convert the bitwidth when necessary: [MatrixFetcher.scala](./spatten_hardware/hardware/src/main/scala/spatten/MatrixFetcher.scala)
+- The Q\*K (7) and Prob\*V (11) unit and the corresponding key / value buffers: [DotProduct.scala](./spatten_hardware/hardware/src/main/scala/spatten/DotProduct.scala), [MultiplyValue.scala](./spatten_hardware/hardware/src/main/scala/spatten/MultiplyValue.scala), [Buffer.scala](./spatten_hardware/hardware/src/main/scala/spatten/Buffer.scala), [BufferManager.scala](./spatten_hardware/hardware/src/main/scala/spatten/BufferManager.scala)
+- A progressive quantization module (9) to decide whether or not to load the LSBs of keys: [RequantDecision.scala](./spatten_hardware/hardware/src/main/scala/spatten/RequantDecision.scala)
 
 
 ## TODOs
