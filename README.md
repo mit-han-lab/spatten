@@ -92,9 +92,8 @@ This repo contains the following major modules in SpAtten, and the main pipeline
 We will release the code and data soon, please stay tuned.
 
 - [ ] Release core code of SpAtten, including Llama-2, MPT, Falcon, and Pythia.
-- [ ] Release perplexity evaluation code
+- [ ] Release SpAtten perplexity evaluation code
 - [ ] Release SpAtten Llama Chatbot demo.
-- [ ] Release SpAtten evaluation code.
 - [ ] Release a docker image for hardware simulation.
 
 
