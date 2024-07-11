@@ -11,7 +11,9 @@
 We propose sparse attention (SpAtten) with **KV token pruning, local V pruning, head pruning, and KV progressive quantization** to improve LLM efficiency.
 
 ## News
-
+- SpAtten and SpAtten-Chip won the 1st Place Award at 2023 DAC University Demo.
+- SpAtten is spotlighted on [MIT Homepage](http://mit.edu/spotlight/streamlining-sentence-analysis)
+- SpAtten is covered by [MIT News](https://news.mit.edu/2021/language-learning-efficiency-0210)
 - [2023/10] SpAtten-LLM and SpAtten hardware released.
 
 
