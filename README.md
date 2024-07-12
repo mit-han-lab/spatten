@@ -28,7 +28,7 @@ We present SpAtten, an efficient algorithm-architecture co-design that leverages
 
 
 
-## SpAtten LLM Usage
+## SpAtten Usage
 
 ### Environment Setup
 
