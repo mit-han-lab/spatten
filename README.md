@@ -20,7 +20,9 @@ We propose sparse attention (SpAtten) with **KV token pruning, local V pruning, 
 ## Abstract
 We present SpAtten, an efficient algorithm-architecture co-design that leverages token sparsity, head sparsity, and quantization opportunities to reduce the attention computation and memory access. Inspired by the high redundancy of human languages, we propose the novel KV token pruning to prune away unimportant tokens in the sentence. We also propose head pruning to remove unessential heads. Cascade pruning is fundamentally different from weight pruning since there is no trainable weight in the attention mechanism, and the pruned tokens and heads are selected on the fly. To efficiently support them on hardware, we design a novel top-k engine to rank token and head importance scores with high throughput. Furthermore, we propose KV progressive quantization that first fetches MSBs only and performs the computation; if the confidence is low, it fetches LSBs and recomputes the attention outputs, trading computation for memory reduction.
 
+![basic_idea](assets/corrected_teaser.png)
 ![schemes](assets/fig_gpt.jpeg)
+
 
 
 ## SpAtten LLM Usage
