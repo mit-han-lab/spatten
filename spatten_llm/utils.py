@@ -60,6 +60,7 @@ def load(model_name_or_path):
         device_map="auto",
         torch_dtype=torch.float16,
         trust_remote_code=True,
+        attn_implementation="eager",
     )
     if tokenizer.pad_token_id is None:
         if tokenizer.eos_token_id is not None:
