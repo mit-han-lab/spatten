@@ -13,90 +13,114 @@ import lm_eval
 import lm_eval.models
 
 from transformers.modeling_outputs import CausalLMOutputWithPast
+from transformers.tokenization_utils import PreTrainedTokenizer
 
 from spatten_llm.utils import load
-from spatten_llm.kv_cache_token_pruning import SpAttenStaticCache
-from spatten_llm.pos_shift.modify_llama import enable_llama_spatten
+from spatten_llm.kv_cache_token_pruning import SpAttenStaticCache, SpAttenDynamicCache, SpAttenCache
+from spatten_llm.pos_shift.modify_llama import enable_llama_spatten, SpAttenConfig
 
 from lmquant.llm.eval import LlmEvalConfig
 
-@torch.no_grad()
-def spatten_logits(config, forward, input_ids):
-    print(input_ids.shape)
-    print(input_ids)
-    (bsz, ntokens) = input_ids.shape
-    past_key_values = SpAttenStaticCache(config, bsz, ntokens, device=input_ids.device, dtype=torch.float16)
-    # past_key_values = SpAttenDynamicCache()
-    past_key_values.init_spatten_cache()
-    logits = None
-    print(torch.cuda.memory_allocated(0))
-    for step in tqdm(range(ntokens)):
-        outputs = forward(
-            input_ids=input_ids[:, step:step+1],
-            past_key_values=past_key_values,
-            use_cache=True,
-        )
-        past_key_values = outputs.past_key_values
-        if logits is None:
-            logits = outputs.logits
-        else:
-            assert logits.ndim == 3
-            assert logits.shape[1] == step
-            logits = torch.cat([logits, outputs.logits], dim=1)
-        for layer, score in past_key_values.importance_scores.items():
-            target_ntokens = max(4, math.ceil(step * 0.5))
-            if past_key_values.get_num_kept_tokens(layer) > target_ntokens:
-                past_key_values.apply_token_pruning(layer, 0, 0, target_ntokens)
-                # past_key_values.reset_scores(layer)
-        # if step % 20 == 0:
-        #     # print(torch.cuda.memory_allocated(0))
-        #     gc.collect()
-        #     torch.cuda.empty_cache()
-        #     # print(torch.cuda.memory_allocated(0))
-    return logits
+from dataclasses import dataclass
+from typing import Callable, Optional
 
-class SpAttenLMEval(lm_eval.models.huggingface.HFLM):
-    def __init__(self, model, tokenizer, batch_size=1, max_length=None):
-        model.eval()
-        super().__init__(
-            pretrained=model,
-            tokenizer=tokenizer,
-            max_length=max_length,
-            batch_size=batch_size)
-    
-    def _model_call(self, inps, attn_mask=None, labels=None):
-        return spatten_logits(self.model.config, self.model.forward, inps)
-    
-def forward_wrapper(self, *args, **kwargs):
-    for arg in args[1:]:
-        print(f"Warning: ignore arg: {arg}")
-    for name, arg in kwargs.items():
-        print(f"Warning: ignore arg {name}: {arg}")
-    logits = spatten_logits(self.config, self._forward_orig, args[0])
-    return CausalLMOutputWithPast(logits=logits)
+
+
+
+def visualize(tokenizer: PreTrainedTokenizer, input_ids: list, pruned: list):
+    last_pruned = False
+    tokens = []
+    result = ""
+    def decode():
+        nonlocal tokens
+        nonlocal result
+        if len(tokens) == 0:
+            return
+        print(f"{last_pruned} => {tokens}")
+        s = tokenizer.decode(
+            tokens, 
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=True,
+            spaces_between_special_tokens=False,)
+        if last_pruned:
+            result += '<span style="color:gray">' + s + '</span>'
+        else:
+            result += s
+        tokens = []
+    print(input_ids)
+    print(pruned)
+    for i, token in enumerate(input_ids):
+        current_pruned = i < len(pruned) and pruned[i]
+        if current_pruned != last_pruned:
+            decode()
+            last_pruned = current_pruned
+        tokens.append(token)
+    decode()
+    print(result)
+
 
 def main(args):
     model_name_or_path = args.model_name_or_path
     model, tokenizer = load(model_name_or_path)
 
-    # lm_ref = lm_eval.models.huggingface.HFLM(pretrained=model, tokenizer=tokenizer, batch_size=1)
-    # # lm_ref = SpAttenEval(model=model, tokenizer=tokenizer, batch_size=1, use_token_pruning=False)
-    # result_ref = lm_eval.simple_evaluate(lm_ref, tasks=["wikitext"], bootstrap_iters=0, verbosity="DEBUG")
-    # print(json.dumps(result_ref["results"], sort_keys=True, indent=4, default=str))
+    if False:
+        lm_ref = lm_eval.models.huggingface.HFLM(pretrained=model, tokenizer=tokenizer, batch_size=1)
+        # lm_ref = SpAttenEval(model=model, tokenizer=tokenizer, batch_size=1, use_token_pruning=False)
+        result_ref = lm_eval.simple_evaluate(lm_ref, tasks=["wikitext"], limit=1, bootstrap_iters=0, verbosity="DEBUG")
+        print(json.dumps(result_ref["results"], sort_keys=True, indent=4, default=str))
 
-    # LlmEvalConfig().evaluate(model, tokenizer=tokenizer, model_name="llama2-7b")
+    max_seq_length = args.max_seq_length
+    print(f"max_seq_length={max_seq_length}")
 
-    enable_llama_spatten(model)
+    # if args.baseline:
+    #     LlmEvalConfig(max_seq_length=max_seq_length).evaluate(model, tokenizer=tokenizer, model_name="llama2-7b")
 
-    # lm = lm_eval.models.huggingface.HFLM(pretrained=model, tokenizer=tokenizer)
-    # lm = SpAttenEval(model=model, tokenizer=tokenizer, batch_size=2)
-    # result = lm_eval.simple_evaluate(lm, tasks=["wikitext"], bootstrap_iters=0, verbosity="DEBUG")
-    # print(json.dumps(result["results"], sort_keys=True, indent=4, default=str))
+    config = SpAttenConfig(
+        sparsity=args.sparsity,
+        target_ntokens=(args.sparsity * max_seq_length if args.target_ntokens is None else args.target_ntokens),
+        policy=args.policy,
+        per_layer=not args.cascade,
+        threshold=args.threshold,
+    )
+    if args.visualize:
+        config.spatten_visualizer = lambda input_ids, pruned: visualize(tokenizer, input_ids, pruned)
+
+    if args.baseline:
+        lm = lm_eval.models.huggingface.HFLM(pretrained=model, tokenizer=tokenizer)
+        result = lm_eval.simple_evaluate(lm, tasks=args.lmeval_tasks, bootstrap_iters=0, verbosity="DEBUG", num_fewshot=args.shots)
+        print(json.dumps(result["results"], sort_keys=True, indent=4, default=str))
+        # return
+
+    enable_llama_spatten(model, config)
+
+    if False:
+        # lm = lm_eval.models.huggingface.HFLM(pretrained=model, tokenizer=tokenizer)
+        lm = SpAttenLMEval(model=model, tokenizer=tokenizer, batch_size=2)
+        result = lm_eval.simple_evaluate(lm, tasks=["wikitext"], limit=1, bootstrap_iters=0, verbosity="DEBUG")
+        print(json.dumps(result["results"], sort_keys=True, indent=4, default=str))
+        return
+    
+    if True:
+        lm = lm_eval.models.huggingface.HFLM(pretrained=model, tokenizer=tokenizer)
+        result = lm_eval.simple_evaluate(lm, tasks=args.lmeval_tasks, bootstrap_iters=0, verbosity="DEBUG", num_fewshot=args.shots)
+        print(json.dumps(result["results"], sort_keys=True, indent=4, default=str))
+        return
 
     # wrapper = SpAttenLMQuantWrapper(model)
-    model._forward_orig = model.forward
-    model.forward = types.MethodType(forward_wrapper, model)
-    LlmEvalConfig(max_seq_length=4096).evaluate(model, tokenizer=tokenizer, model_name="llama2-7b")
+    
+    
+
+    past_key_values = SpAttenDynamicCache()
+    past_key_values.init_spatten_cache(config.per_layer)
+    past_key_values.value_pruning_threshold = config.threshold
+    print(model.generate(
+            torch.tensor([[128000]], dtype=torch.int).cuda(),
+            max_new_tokens=128,
+            use_cache=True,
+            return_dict_in_generate=True,
+            past_key_values=past_key_values))
+    
+    LlmEvalConfig(max_seq_length=max_seq_length).evaluate(model, tokenizer=tokenizer, model_name="llama2-7b")
 
 
 if __name__ == "__main__":
@@ -104,6 +128,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model_name_or_path", type=str, default="lmsys/vicuna-13b-v1.3"
     )
+    parser.add_argument(
+        "--sparsity", type=float, default=0.5
+    )
+    parser.add_argument("--target_ntokens", type=int)
+    parser.add_argument("--policy", type=str, required=True)
+    parser.add_argument("--max_seq_length", type=int, default=4096)
+    parser.add_argument("--cascade", action="store_true")
+    parser.add_argument("--threshold", type=float, default=1e-5)
+    parser.add_argument("--visualize", action="store_true")
+    parser.add_argument("--baseline", action="store_true")
+    parser.add_argument("--shots", type=int, default=1)
+    parser.add_argument("--lmeval_tasks", type=str, nargs='+', default=["piqa", "copa", "openbookqa", "winogrande", "mathqa", "hellaswag", "arc_easy", "arc_challenge"])
 
     args = parser.parse_args()
     main(args)

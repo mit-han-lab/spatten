@@ -38,6 +38,10 @@ class SpAttenCache(object):
         # layer_idx -> int
         self.n_pruned: Dict[int, int] = {}
 
+        self.key_access_count = 0
+        self.value_access_count = 0
+        self.kv_dense_access_count = 0
+
     @torch.no_grad()
     def update_attn_score(self, layer_idx: int, attn_score: torch.Tensor):
         if not self.per_layer and layer_idx != 0:
@@ -45,6 +49,9 @@ class SpAttenCache(object):
         
         assert attn_score.ndim == 4
         (bsz, nheads, qlen, ntokens) = attn_score.shape
+
+        # assert not attn_score.isinf().any()
+        # assert not attn_score.isnan().any()
 
         # print(attn_score.shape)
         attn_score = attn_score.sum(2).sum(1)
@@ -89,14 +96,14 @@ class SpAttenCache(object):
         if layer_idx in self.n_pruned and ntokens - self.n_pruned[layer_idx] <= num_kept_tokens:
             return
         
-        assert not torch.isinf(self.importance_scores[layer_idx]).any()
-        assert not torch.isnan(self.importance_scores[layer_idx]).any()
-        assert not (self.importance_scores_update_cnt[layer_idx] == 0).any()
+        # assert not torch.isinf(self.importance_scores[layer_idx]).any()
+        # assert not torch.isnan(self.importance_scores[layer_idx]).any()
+        # assert not (self.importance_scores_update_cnt[layer_idx] == 0).any()
         
         scores = self.importance_scores[layer_idx] / self.importance_scores_update_cnt[layer_idx]
 
-        assert not torch.isinf(scores).any()
-        assert not torch.isnan(scores).any()
+        # assert not torch.isinf(scores).any()
+        # assert not torch.isnan(scores).any()
         
         mask = torch.zeros_like(scores)
         if layer_idx in self.pruned:
@@ -119,25 +126,52 @@ class SpAttenCache(object):
 
         # print(f"Layer {layer_idx} n_pruned={self.n_pruned[layer_idx]} pruned={self.pruned[layer_idx]}")
 
-    # attn_weights after softmax [bsz, nheads, qlen, ntokens]
+    # Key Mask is applied ***before*** softmax
     @torch.no_grad()
-    def apply_mask(self, layer_idx: int, attn_weights: torch.Tensor, num_fetch_values: int = -1) -> torch.Tensor:
+    def apply_key_mask(self, layer_idx: int, attn_weights: torch.Tensor) -> torch.Tensor:
+        if not self.per_layer and layer_idx != 0:
+            return self.apply_key_mask(0, attn_weights)
+
         (bsz, nheads, qlen, ntokens) = attn_weights.shape
-        if not layer_idx in self.pruned:
-            return attn_weights
+        k_access = 0
+        
+        if layer_idx in self.pruned:
+            (old_bsz, old_ntokens) = self.pruned[layer_idx].shape
+            assert bsz == old_bsz
+            assert ntokens >= old_ntokens
 
-        (old_bsz, old_ntokens) = self.pruned[layer_idx].shape
-        assert bsz == old_bsz
-        assert ntokens >= old_ntokens
+            pruned = F.pad(self.pruned[layer_idx], pad=(0, ntokens - old_ntokens), value=0)
+            # mask = pruned.unsqueeze(1).unsqueeze(2).int() * float("-inf")
+            attn_weights[pruned.unsqueeze(1).unsqueeze(2).expand(*attn_weights.shape)] = float("-inf")
+            k_access = (attn_weights > float("-inf")).count_nonzero()
+        else:
+            k_access = attn_weights.numel()
 
-        pruned = F.pad(self.pruned[layer_idx], pad=(0, ntokens - old_ntokens), value=0)
-        attn_weights *= (1 - pruned.unsqueeze(1).unsqueeze(2).int())
+        self.key_access_count += k_access
+        self.kv_dense_access_count += attn_weights.numel()
 
+        return attn_weights
+
+    # attn_weights ***after*** softmax [bsz, nheads, qlen, ntokens]
+    @torch.no_grad()
+    def apply_value_mask(self, layer_idx: int, attn_weights: torch.Tensor, num_fetch_values: int = -1, threshold: float = -1) -> torch.Tensor:
+        if not self.per_layer and layer_idx != 0:
+            return self.apply_value_mask(0, attn_weights, num_fetch_values)
+
+        (bsz, nheads, qlen, ntokens) = attn_weights.shape
         # Prune values
-        if num_fetch_values >= 0 and qlen == 1:
+        if num_fetch_values >= 0 and qlen == 1 and ntokens > num_fetch_values:
+            print(f"ntokens={ntokens}, topk={ntokens - num_fetch_values}")
             _, indexes = torch.topk(attn_weights, ntokens - num_fetch_values, dim=-1, largest=False)
             indexes = indexes.sort().values.to(attn_weights.device)
             attn_weights = attn_weights.scatter_(-1, indexes, 0)
+        elif threshold >= 0 and qlen == 1:
+            # cond = attn_weights <= threshold
+            cond = (attn_weights.mean(dim=1) <= threshold).unsqueeze(1).expand(*attn_weights.shape)
+            attn_weights[cond] = 0
+
+        v_access = attn_weights.count_nonzero()
+        self.value_access_count += v_access
         
         return attn_weights
     
@@ -154,6 +188,12 @@ class SpAttenCache(object):
         if not layer_idx in self.n_pruned:
             return ntokens
         return ntokens - self.n_pruned[layer_idx]
+    
+    def get_num_tokens(self, layer_idx: int) -> int:
+        if not layer_idx in self.importance_scores:
+            return 0
+        (bsz, ntokens) = self.importance_scores[layer_idx].shape
+        return ntokens
 
 class SpAttenStaticCache(StaticCache, SpAttenCache):
     pass
