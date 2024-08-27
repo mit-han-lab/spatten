@@ -63,17 +63,7 @@ def main(args):
     model_name_or_path = args.model_name_or_path
     model, tokenizer = load(model_name_or_path)
 
-    if False:
-        lm_ref = lm_eval.models.huggingface.HFLM(pretrained=model, tokenizer=tokenizer, batch_size=1)
-        # lm_ref = SpAttenEval(model=model, tokenizer=tokenizer, batch_size=1, use_token_pruning=False)
-        result_ref = lm_eval.simple_evaluate(lm_ref, tasks=["wikitext"], limit=1, bootstrap_iters=0, verbosity="DEBUG")
-        print(json.dumps(result_ref["results"], sort_keys=True, indent=4, default=str))
-
     max_seq_length = args.max_seq_length
-    print(f"max_seq_length={max_seq_length}")
-
-    # if args.baseline:
-    #     LlmEvalConfig(max_seq_length=max_seq_length).evaluate(model, tokenizer=tokenizer, model_name="llama2-7b")
 
     config = SpAttenConfig(
         sparsity=args.sparsity,
@@ -86,41 +76,20 @@ def main(args):
         config.spatten_visualizer = lambda input_ids, pruned: visualize(tokenizer, input_ids, pruned)
 
     if args.baseline:
+        print("Evaluating Baseline")
+    else:
+        print(f"Evaluating SpAtten with config={config}")
+        enable_llama_spatten(model, config)
+
+    if args.lmquant_tasks and len(args.lmquant_tasks) >= 1:
+        print(f"Evaluating perplexity on {args.lmquant_tasks} using LMQuant, max_seq_length={max_seq_length}")
+        LlmEvalConfig(max_seq_length=max_seq_length, tasks=args.lmquant_tasks).evaluate(model, tokenizer=tokenizer, model_name="spatten")
+    else:
+        print(f"Evaluating accuracy on {args.lmeval_tasks} using lm_eval")
         lm = lm_eval.models.huggingface.HFLM(pretrained=model, tokenizer=tokenizer)
         result = lm_eval.simple_evaluate(lm, tasks=args.lmeval_tasks, bootstrap_iters=0, verbosity="DEBUG", num_fewshot=args.shots)
         print(json.dumps(result["results"], sort_keys=True, indent=4, default=str))
-        # return
-
-    enable_llama_spatten(model, config)
-
-    if False:
-        # lm = lm_eval.models.huggingface.HFLM(pretrained=model, tokenizer=tokenizer)
-        lm = SpAttenLMEval(model=model, tokenizer=tokenizer, batch_size=2)
-        result = lm_eval.simple_evaluate(lm, tasks=["wikitext"], limit=1, bootstrap_iters=0, verbosity="DEBUG")
-        print(json.dumps(result["results"], sort_keys=True, indent=4, default=str))
-        return
     
-    if True:
-        lm = lm_eval.models.huggingface.HFLM(pretrained=model, tokenizer=tokenizer)
-        result = lm_eval.simple_evaluate(lm, tasks=args.lmeval_tasks, bootstrap_iters=0, verbosity="DEBUG", num_fewshot=args.shots)
-        print(json.dumps(result["results"], sort_keys=True, indent=4, default=str))
-        return
-
-    # wrapper = SpAttenLMQuantWrapper(model)
-    
-    
-
-    past_key_values = SpAttenDynamicCache()
-    past_key_values.init_spatten_cache(config.per_layer)
-    past_key_values.value_pruning_threshold = config.threshold
-    print(model.generate(
-            torch.tensor([[128000]], dtype=torch.int).cuda(),
-            max_new_tokens=128,
-            use_cache=True,
-            return_dict_in_generate=True,
-            past_key_values=past_key_values))
-    
-    LlmEvalConfig(max_seq_length=max_seq_length).evaluate(model, tokenizer=tokenizer, model_name="llama2-7b")
 
 
 if __name__ == "__main__":
@@ -140,6 +109,7 @@ if __name__ == "__main__":
     parser.add_argument("--baseline", action="store_true")
     parser.add_argument("--shots", type=int, default=1)
     parser.add_argument("--lmeval_tasks", type=str, nargs='+', default=["piqa", "copa", "openbookqa", "winogrande", "mathqa", "hellaswag", "arc_easy", "arc_challenge"])
+    parser.add_argument("--lmquant_tasks", type=str, nargs='+')
 
     args = parser.parse_args()
     main(args)

@@ -32,6 +32,35 @@ We present SpAtten, an efficient algorithm-architecture co-design that leverages
   <img width="560" src="assets/fig_gpt.jpeg">
 </p>
 
+## Evaluated Results on LLM
+
+### Perlexity Results
+| KV Cache Access (%) | KV Cache Budget (%) | Perplexity on Wikitext2 (lower is better) |
+|:-------------------:|:-------------------:|:-----------------------------------------:|
+|          20         |          11         |                   5.4627                  |
+|          30         |          16         |                   5.3101                  |
+|          50         |          29         |                   5.1898                  |
+|          70         |          45         |                   5.1409                  |
+|          80         |          55         |                   5.1276                  |
+|         100         |         100         |                   5.1164                  |
+
+### Accuracy Results
+
+| KV Cache Budget |    COPA   | OpenBookQA |    PiQA   | Winogrande |   MathQA  |  ARC-Easy | ARC-Challenge | HellaSwag |
+|:---------------:|:---------:|:----------:|:---------:|:----------:|:---------:|:---------:|:-------------:|:---------:|
+|       0.1       |   0.610   |    0.262   |   0.694   |    0.511   |   0.211   |   0.493   |     0.333     |   0.706   |
+|       0.2       |   0.790   |    0.364   |   0.779   |    0.636   |   0.233   |   0.727   |     0.445     |   0.752   |
+|       0.3       |   0.870   |    0.414   |   0.798   |    0.692   |   0.260   |   0.758   |     0.466     |   0.758   |
+|       0.4       |   0.860   |    0.436   |   0.798   |    0.686   |   0.264   |   0.777   |     0.483     |   0.760   |
+|       0.5       |   0.880   |    0.436   |   0.797   |    0.699   |   0.280   |   0.790   |     0.497     |   0.761   |
+|       0.6       |   0.890   |    0.444   |   0.795   |    0.697   |   0.288   |   0.791   |     0.496     |   0.762   |
+|       0.7       |   0.900   |    0.438   |   0.797   |    0.698   |   0.297   |   0.796   |     0.511     |   0.762   |
+|       0.8       |   0.910   |    0.442   |   0.794   |    0.699   |   0.304   |   0.796   |     0.509     |   0.763   |
+|      **1**      | **0.910** |  **0.440** | **0.800** |  **0.699** | **0.299** | **0.797** |     **0.514** | **0.763** |
+
+<p align="center">
+  <img width="560" src="assets/spatten-accuracy.png">
+</p>
 
 
 ## SpAtten Usage
@@ -39,20 +68,44 @@ We present SpAtten, an efficient algorithm-architecture co-design that leverages
 ### Environment Setup
 
 ```bash
-conda create -yn spatten python=3.8
+conda create -yn spatten python=3.10
 conda activate spatten
 
+# lmquant for perplexity evaluation
+git clone https://github.com/mit-han-lab/lmquant
+cd lmquant
+poetry install
+cd ..
+
+# lmeval for accuracy evaluation
+git clone https://github.com/EleutherAI/lm-evaluation-harness
+cd lm-evaluation-harness
+pip install -e .
+cd ..
+
+git clone https://github.com/mit-han-lab/spatten
+cd spatten
+
 pip install torch torchvision torchaudio
-pip install transformers==4.33.0 accelerate datasets evaluate wandb scikit-learn scipy sentencepiece
+pip install transformers==4.43.3 accelerate datasets evaluate wandb scikit-learn scipy sentencepiece
 
 python setup.py develop
 ```
 
-### Run SpAtten Llama Chatbot
+### Evaluate Perlexity 
+```bash
+python3 eval_spatten.py  --model_name_or_path /path/to/model/llama-2-7b-hf/ --sparsity 0.5 --policy spatten_ratio_size --lmquant_tasks wikitext
+```
+
+### Evaluate Accuracy
+```bash
+python3 eval_spatten.py  --model_name_or_path /path/to/model/llama-2-7b-hf/ --sparsity 0.5 --policy spatten_ratio_size --shots 1 --lmeval_tasks piqa
+```
+<!-- ### Run SpAtten Llama Chatbot
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python run_spatten_llama.py  --enable_spatten
-```
+``` -->
 
 ## SpAtten Hardware Usage
 This repo also contains the RTL-level simulation model of SpAtten in `spatten_hardware/hardware/` for accurate performance evaluation on generative models like GPT-2 and a fast behavior model in `spatten_hardware/simulator` for quick evaluation on BERT.
@@ -101,13 +154,13 @@ This repo contains the following major modules in SpAtten, and the main pipeline
 - A progressive quantization module (9) to decide whether or not to load the LSBs of keys: [RequantDecision.scala](./spatten_hardware/hardware/src/main/scala/spatten/RequantDecision.scala)
 
 
-## TODOs
+<!-- ## TODOs
 We will release the code and data soon, please stay tuned.
 
 - [ ] Release core code of SpAtten, including Llama-2, MPT, Falcon, and Pythia.
 - [ ] Release SpAtten perplexity evaluation code
 - [ ] Release SpAtten Llama Chatbot demo.
-- [ ] Release a docker image for hardware simulation.
+- [ ] Release a docker image for hardware simulation. -->
 
 
 ## Citation
